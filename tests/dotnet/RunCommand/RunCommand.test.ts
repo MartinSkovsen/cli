@@ -5,6 +5,7 @@ jest.mock('../../../src/io', () => ({
     getPrunerPath: async () => "tests/dotnet/RunCommand/temp/.pruner"
 }));
 
+
 import { join } from 'path';
 import * as rimraf from 'rimraf';
 import {copy} from 'fs-extra';
@@ -12,10 +13,17 @@ import { handler } from '../../../src/commands/RunCommand';
 import _ from 'lodash';
 import { readFromFile, writeToFile } from '../../../src/io';
 import { State } from '../../../src/providers';
+import { getCurrentDiffText } from "../../../src/git";
+import { mocked } from 'ts-jest/utils'
+import { error } from 'console';
 
 const gitDiff: (a: string, b: string) => string = require('git-diff');
 
 describe("RunCommand", () => {
+    jest.mock("../../../src/git");
+    const mockedMethod = mocked(getCurrentDiffText, false);
+    mockedMethod.mockImplementation(() => {throw error("")});
+
     const cleanup = async () => {
         rimraf.sync(join(__dirname, "temp"));
     }
@@ -60,11 +68,6 @@ describe("RunCommand", () => {
             existingFilePath,
             templateFileContents.toString());
     }
-
-    jest.mock('../../../src/git', () => ({
-        ...(jest.requireActual('../../../src/git')),
-        getCurrentDiffText: async () => mockCurrentDiff
-    }));
 
     beforeEach(async () => {
         await cleanup();
