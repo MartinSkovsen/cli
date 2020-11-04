@@ -7,8 +7,6 @@ jest.mock('../../../src/io', () => ({
 
 
 import { join } from 'path';
-import * as rimraf from 'rimraf';
-import {copy} from 'fs-extra';
 import { handler } from '../../../src/commands/RunCommand';
 import _ from 'lodash';
 import { readFromFile, writeToFile } from '../../../src/io';
@@ -54,15 +52,27 @@ describe("RunCommand", () => {
         return coverage.map(x => x.lineNumber);
     }
 
-    let mockCurrentDiff: string;
-    const overwriteCode = async (fileName: string) => {
-        const templateFileContents = await readFromFile(join(__dirname, fileName));
-        const templateFileName = `${fileName.substr(0, fileName.indexOf("."))}.cs`;
-        
-        const existingFilePath = join(__dirname, "temp", "Sample", templateFileName);
-        const existingFileContents = await readFromFile(existingFilePath);
+    const gitDiff = async (path1: string, path2: string) => {
+        const result = await execa("git", [
+            "diff",
+            "--no-index",
+            path1,
+            path2
+        ], {
+            reject: false
+        });
+        return result.stdout;
+    }
 
-        mockCurrentDiff = gitDiff(existingFileContents, templateFileContents);
+    const overwriteCode = async (fileName: string) => {
+        const overwrittenFileName = `${fileName.substr(0, fileName.indexOf("."))}.cs`;
+
+        const existingFilePath = join(__dirname, "temp", "Sample", overwrittenFileName);
+        const templateFilePath = join(__dirname, fileName);
+
+        mockCurrentDiff = await gitDiff(existingFilePath, templateFilePath);
+
+        const templateFileContents = await readFromFile(templateFilePath);
 
         await writeToFile(
             existingFilePath,
@@ -85,31 +95,31 @@ describe("RunCommand", () => {
             }));
     });
 
-    test('run -> check coverage', async () => {
-        await overwriteCode("SomeClass.1.cs");
+    // test('run -> check coverage', async () => {
+    //     await overwriteCode("SomeClass.1.cs");
 
-        await handler({
-            provider: "dotnet"
-        });
+    //     await handler({
+    //         provider: "dotnet"
+    //     });
 
-        const coverage = await getCoveredLineNumbersForFile("SomeClass.cs");
-        expect(coverage).toEqual(lineRange(10, 17));
-    });
+    //     const coverage = await getCoveredLineNumbersForFile("SomeClass.cs");
+    //     expect(coverage).toEqual(lineRange(10, 17));
+    // });
 
-    test('run -> run -> check coverage', async () => {
-        await overwriteCode("SomeClass.1.cs");
+    // test('run -> run -> check coverage', async () => {
+    //     await overwriteCode("SomeClass.1.cs");
 
-        await handler({
-            provider: "dotnet"
-        });
+    //     await handler({
+    //         provider: "dotnet"
+    //     });
 
-        await handler({
-            provider: "dotnet"
-        });
+    //     await handler({
+    //         provider: "dotnet"
+    //     });
 
-        const coverage = await getCoveredLineNumbersForFile("SomeClass.cs");
-        expect(coverage).toEqual(lineRange(10, 17));
-    });
+    //     const coverage = await getCoveredLineNumbersForFile("SomeClass.cs");
+    //     expect(coverage).toEqual(lineRange(10, 17));
+    // });
 
     test('run -> change condition -> run -> check coverage', async () => {
         await overwriteCode("SomeClass.1.cs");
